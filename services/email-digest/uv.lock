@@ -2,12 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 
-[manifest]
-members = [
-    "capmatch-comms",
-    "email-digest",
-]
-
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -29,11 +23,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bcc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
 ]
-
-[[package]]
-name = "capmatch-comms"
-version = "0.1.0"
-source = { virtual = "." }
 
 [[package]]
 name = "certifi"
@@ -201,7 +190,7 @@ wheels = [
 [[package]]
 name = "email-digest"
 version = "0.1.0"
-source = { virtual = "services/email-digest" }
+source = { virtual = "." }
 dependencies = [
     { name = "python-dotenv" },
     { name = "resend" },
