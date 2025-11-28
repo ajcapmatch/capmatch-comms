@@ -11,6 +11,8 @@ PARENT_DIR = Path(__file__).resolve().parents[1]
 if str(PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(PARENT_DIR))
 
+from datetime import datetime, timezone
+from email_builder import build_digest_email  # noqa: E402
 from email_sender import send_digest_email  # noqa: E402
 
 SCENARIOS = {
@@ -35,8 +37,37 @@ def main() -> None:
     recipient = SCENARIOS[args.scenario]
     print(f"Sending digest sample to {recipient} (scenario={args.scenario})")
 
-    html_body = "<p>This is a <strong>Resend test</strong> for CapMatch digests.</p>"
-    text_body = "This is a Resend test for CapMatch digests."
+    sample_events = [
+        {
+            "id": 1,
+            "project_id": "project-1",
+            "event_type": "chat_message_sent",
+            "payload": {"mentioned_user_ids": []},
+        },
+        {
+            "id": 2,
+            "project_id": "project-1",
+            "event_type": "document_uploaded",
+        },
+        {
+            "id": 3,
+            "project_id": "project-2",
+            "event_type": "chat_message_sent",
+            "payload": {"mentioned_user_ids": ["tester"]},
+        },
+    ]
+    project_names = {
+        "project-1": "Downtown Highrise Acquisition",
+        "project-2": "Seaside Retail Portfolio",
+    }
+
+    html_body, text_body = build_digest_email(
+        events=sample_events,
+        user_name="CapMatch Tester",
+        project_names=project_names,
+        user_id="tester",
+        digest_date=datetime.now(timezone.utc),
+    )
 
     success = send_digest_email(
         user_email=recipient,

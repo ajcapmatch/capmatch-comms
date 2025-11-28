@@ -90,11 +90,13 @@ def process_user_digest(
         project_names = db.get_project_names(project_ids)
         
         # Build email
+        digest_timestamp = datetime.combine(digest_date, datetime.min.time(), tzinfo=timezone.utc)
         html_body, text_body = build_digest_email(
             recipient_events,
             user_name,
             project_names,
-            user_id
+            user_id,
+            digest_timestamp,
         )
         
         if not html_body or not text_body:

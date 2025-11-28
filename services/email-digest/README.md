@@ -99,6 +99,17 @@ uv run --env-file .env.local python scripts/send_resend_test.py --scenario deliv
 
 Available scenarios: `delivered`, `bounced`, `complained`. Ensure your `.env.local` includes `RESEND_API_KEY`, `EMAIL_FROM`, and optionally `RESEND_TEST_RECIPIENT` / `RESEND_FORCE_TO_EMAIL`.
 
+### Update the Digest Template
+
+React Email lives in `services/email-digest/templates/`. To modify the HTML:
+
+1. Install deps once: `cd templates && npm install`.
+2. Edit `DigestEmail.tsx` (uses React Email + TASA Orbiter branding).
+3. Render the static HTML: `npm run render` (writes `templates/dist/digest-template.html`).
+4. Commit both the TSX changes and the generated HTML so the Python worker can load the latest markup.
+
+> Tip: run `npm run preview` inside `templates/` to open a live preview while designing.
+
 ## How It Works
 
 1. **Get Users**: Queries `user_notification_preferences` for users with `status='digest'` and `channel='email'`

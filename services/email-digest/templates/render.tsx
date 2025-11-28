@@ -34,18 +34,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function main() {
-  const sampleData: DigestTemplateData = {
-    previewText: "3 updates across Downtown Highrise",
-    userName: "Cody Field",
-    digestDateLabel: "November 27, 2025",
-    ctaUrl: "https://capmatch.com/dashboard",
-    managePrefsUrl: "https://capmatch.com/settings/notifications",
-    projectSectionsHtml: sampleProjectSections,
-  };
+const useSampleData = process.env.USE_SAMPLE_DATA === "true";
 
-  const html = await render(<DigestEmail {...sampleData} />, {
+const sampleData: DigestTemplateData = {
+  previewText: "3 updates across Downtown Highrise",
+  userName: "Cody Field",
+  digestDateLabel: "November 27, 2025",
+  ctaUrl: "https://capmatch.com/dashboard",
+  managePrefsUrl: "https://capmatch.com/settings/notifications",
+  projectSectionsHtml: sampleProjectSections,
+};
+
+const html = await render(
+  <DigestEmail {...(useSampleData ? sampleData : {})} />,
+  {
     pretty: true,
-  });
+  }
+);
 
   const distDir = join(__dirname, "dist");
   mkdirSync(distDir, { recursive: true });
