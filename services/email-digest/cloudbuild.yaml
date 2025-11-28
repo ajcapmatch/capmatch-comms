@@ -1,0 +1,37 @@
+# cloudbuild.yaml for email-digest worker - not tested yet
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      [
+        "build",
+        "-t",
+        "us-central1-docker.pkg.dev/$PROJECT_ID/email-digest/email-digest:$COMMIT_SHA",
+        "."
+      ]
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      [
+        "push",
+        "us-central1-docker.pkg.dev/$PROJECT_ID/email-digest/email-digest:$COMMIT_SHA"
+      ]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      [
+        "run",
+        "jobs",
+        "deploy",
+        "email-digest",
+        "--image",
+        "us-central1-docker.pkg.dev/$PROJECT_ID/email-digest/email-digest:$COMMIT_SHA",
+        "--region",
+        "us-west1",
+        "--project",
+        "$PROJECT_ID"
+      ]
+
+images:
+  - "us-central1-docker.pkg.dev/$PROJECT_ID/email-digest/email-digest:$COMMIT_SHA"
+
