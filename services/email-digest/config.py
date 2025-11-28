@@ -15,6 +15,9 @@ class Config:
     # Email configuration (for future use)
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "notifications@capmatch.com")
+    RESEND_TEST_MODE: bool = os.getenv("RESEND_TEST_MODE", "true").lower() == "true"
+    RESEND_TEST_RECIPIENT: Optional[str] = os.getenv("RESEND_TEST_RECIPIENT")
+    RESEND_FORCE_TO_EMAIL: Optional[str] = os.getenv("RESEND_FORCE_TO_EMAIL")
     
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

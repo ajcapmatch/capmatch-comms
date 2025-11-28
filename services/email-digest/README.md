@@ -89,6 +89,16 @@ export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 uv run python main.py
 ```
 
+### Test Resend Email Sending
+
+Use the helper script to hit Resend's sandbox recipients without running the full worker:
+
+```bash
+uv run --env-file .env.local python scripts/send_resend_test.py --scenario delivered
+```
+
+Available scenarios: `delivered`, `bounced`, `complained`. Ensure your `.env.local` includes `RESEND_API_KEY`, `EMAIL_FROM`, and optionally `RESEND_TEST_RECIPIENT` / `RESEND_FORCE_TO_EMAIL`.
+
 ## How It Works
 
 1. **Get Users**: Queries `user_notification_preferences` for users with `status='digest'` and `channel='email'`
