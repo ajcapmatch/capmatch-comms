@@ -21,3 +21,6 @@ ENV/
 # Logs
 *.log
 
+*/node_modules/
+templates/dist/
+
