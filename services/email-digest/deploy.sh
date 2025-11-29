@@ -6,18 +6,25 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
 
 echo "=========================================="
 echo "Email Digest Worker - Deployment"
 echo "=========================================="
 
-# Check if we're in a git repo and can pull
-if [ -d ".git" ]; then
+# Find git root (where .git directory actually is)
+GIT_ROOT="$SCRIPT_DIR"
+while [ "$GIT_ROOT" != "/" ] && [ ! -d "$GIT_ROOT/.git" ]; do
+    GIT_ROOT="$(dirname "$GIT_ROOT")"
+done
+
+# Check if we found a git repo and can pull
+if [ -d "$GIT_ROOT/.git" ]; then
     echo ""
-    echo "Step 1: Pulling latest code..."
+    echo "Step 1: Pulling latest code from $GIT_ROOT..."
+    cd "$GIT_ROOT"
     git pull
     echo "✓ Code updated"
+    cd "$SCRIPT_DIR"
 else
     echo ""
     echo "⚠️  Not a git repository, skipping git pull"
