@@ -1,6 +1,7 @@
 """Database connection and query functions using Supabase Python SDK."""
 
 from supabase import create_client, Client
+from supabase.client import ClientOptions
 from typing import List, Dict, Any, Optional, Set
 from datetime import date
 import logging
@@ -12,7 +13,14 @@ class Database:
     """Database connection manager using Supabase client."""
     
     def __init__(self, supabase_url: str, supabase_key: str, *, skip_idempotency: bool = False):
-        self.client: Client = create_client(supabase_url, supabase_key)
+        self.client: Client = create_client(
+            supabase_url,
+            supabase_key,
+            options=ClientOptions(
+                postgrest_client_timeout=30,  # Timeout for database queries in seconds
+                storage_client_timeout=30,    # Timeout for storage operations in seconds
+            )
+        )
         self.skip_idempotency = skip_idempotency
     
     def get_users_with_digest_preferences(self) -> List[Dict[str, Any]]:
