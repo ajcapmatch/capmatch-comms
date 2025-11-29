@@ -17,6 +17,7 @@ ENV/
 # Environment
 .env
 .env.local
+!.env.template
 
 # Logs
 *.log

@@ -4,14 +4,75 @@ Daily email digest service that sends aggregated notifications to users with dig
 
 ## Overview
 
-This Cloud Run Job processes `domain_events` from the previous day and sends digest emails to users who have email digest notifications enabled.
+This service processes `domain_events` from the previous day and sends digest emails to users who have email digest notifications enabled.
 
 ## Architecture
 
-- **Trigger**: Cloud Scheduler (daily at 9 AM PST)
-- **Execution**: Cloud Run Job
+- **Trigger**: Cron job (daily at 9 AM PST) or Cloud Scheduler
+- **Execution**: Docker container on GCP VM or Cloud Run Job
 - **Database**: Supabase PostgreSQL
-- **Email**: Resend API (currently logging to console)
+- **Email**: Resend API
+
+## VM Deployment (Recommended)
+
+### Quick Setup
+
+1. **Clone the repository on your VM:**
+   ```bash
+   git clone <your-repo-url>
+   cd capmatch-comms/services/email-digest
+   ```
+
+2. **Create `.env` file with required variables:**
+   ```bash
+   nano .env
+   ```
+   Add:
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   RESEND_API_KEY=your-resend-api-key
+   EMAIL_FROM=notifications@capmatch.com
+   LOG_LEVEL=INFO
+   RESEND_TEST_MODE=false
+   ```
+
+3. **Run the setup script:**
+   ```bash
+   chmod +x setup-vm.sh
+   ./setup-vm.sh
+   ```
+
+   This will:
+   - Install Docker and Git
+   - Set timezone to Pacific Time
+   - Build the Docker image
+   - Set up cron job (runs daily at 9am PT)
+   - Create log file at `/var/log/email-digest.log`
+
+4. **Test manually:**
+   ```bash
+   ./run-email-digest.sh
+   tail -f /var/log/email-digest.log
+   ```
+
+### Updating the Worker
+
+After pulling new code:
+```bash
+./deploy.sh
+```
+
+This rebuilds the Docker image with the latest code.
+
+### Manual Operations
+
+- **Run worker manually:** `./run-email-digest.sh`
+- **View logs:** `tail -f /var/log/email-digest.log`
+- **Check cron schedule:** `crontab -l`
+- **Edit cron schedule:** `crontab -e`
+
+## Cloud Run Deployment (Alternative)
 
 ## Setup
 
