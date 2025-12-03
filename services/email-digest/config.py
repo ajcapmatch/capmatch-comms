@@ -6,8 +6,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DIGEST_TEMPLATE_PATH = REPO_ROOT / "packages" / "email-templates" / "dist" / "digest-template.html"
+# In the container, WORKDIR is /app and this file lives at /app/config.py.
+APP_ROOT = Path(__file__).resolve().parent
+DEFAULT_DIGEST_TEMPLATE_PATH = (
+    APP_ROOT / "packages" / "email-templates" / "dist" / "digest-template.html"
+)
 
 
 class Config:

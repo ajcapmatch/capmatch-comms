@@ -26,7 +26,13 @@ if [ ! -f "$LOG_FILE" ]; then
 fi
 
 # Run the Docker container
-/usr/bin/docker run --rm \
+DOCKER_BIN="$(command -v docker || true)"
+if [ -z "$DOCKER_BIN" ]; then
+    echo "Error: docker binary not found in PATH."
+    exit 1
+fi
+
+"$DOCKER_BIN" run --rm \
     --env-file .env \
     capmatch-email-digest:prod >> "$LOG_FILE" 2>&1
 
