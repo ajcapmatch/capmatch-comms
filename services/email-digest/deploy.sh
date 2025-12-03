@@ -28,11 +28,12 @@ if [ -d "$GIT_ROOT/.git" ]; then
 else
     echo ""
     echo "⚠️  Not a git repository, skipping git pull"
+    GIT_ROOT="$SCRIPT_DIR"
 fi
 
 echo ""
 echo "Step 2: Rebuilding Docker image..."
-docker build -t capmatch-email-digest:prod .
+docker build -f "$GIT_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$GIT_ROOT"
 echo "✓ Docker image rebuilt"
 
 echo ""

@@ -85,13 +85,14 @@ Set these in Cloud Run Job configuration or Secret Manager:
 - `RESEND_API_KEY`: Resend API key (for future email sending)
 - `EMAIL_FROM`: Sender email address (default: notifications@capmatch.com)
 - `LOG_LEVEL`: Logging level (default: INFO)
+- `DIGEST_TEMPLATE_PATH`: Optional override for the compiled HTML template path (defaults to `packages/email-templates/dist/digest-template.html`)
 - `SKIP_IDEMPOTENCY_CHECK`: Set to `true` while testing to reprocess the same events (default: false)
 
 ### 2. Build Docker Image
 
 ```bash
-cd workers/email-digest
-docker build -t gcr.io/PROJECT_ID/email-digest-worker .
+# run from the repo root
+docker build -f services/email-digest/Dockerfile -t gcr.io/PROJECT_ID/email-digest-worker .
 docker push gcr.io/PROJECT_ID/email-digest-worker
 ```
 
@@ -162,14 +163,14 @@ Available scenarios: `delivered`, `bounced`, `complained`. Ensure your `.env.loc
 
 ### Update the Digest Template
 
-React Email lives in `services/email-digest/templates/`. To modify the HTML:
+React Email templates now live in `packages/email-templates/` so multiple services can share them.
 
-1. Install deps once: `cd templates && npm install`.
+1. Install deps once: `cd packages/email-templates && npm install`.
 2. Edit `DigestEmail.tsx` (uses React Email + TASA Orbiter branding).
-3. Render the static HTML: `npm run render` (writes `templates/dist/digest-template.html`).
-4. Commit both the TSX changes and the generated HTML so the Python worker can load the latest markup.
+3. Render static HTML: `npm run render` (writes `packages/email-templates/dist/digest-template.html`).
+4. Run or deploy the worker. The Python service reads the compiled file via `Config.DIGEST_TEMPLATE_PATH` (override via env var if needed).
 
-> Tip: run `npm run preview` inside `templates/` to open a live preview while designing.
+> Tip: run `npm run preview` inside `packages/email-templates/` for live previews while designing.
 
 ## How It Works
 

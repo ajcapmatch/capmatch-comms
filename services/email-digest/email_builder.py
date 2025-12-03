@@ -15,11 +15,38 @@ logger = logging.getLogger(__name__)
 CTA_URL = "https://capmatch.com/dashboard"
 MANAGE_PREFS_URL = "https://capmatch.com/settings/notifications"
 
-TEMPLATE_PATH = Path(__file__).parent / "templates" / "dist" / "digest-template.html"
-try:
-    TEMPLATE_HTML = TEMPLATE_PATH.read_text(encoding="utf-8")
-except FileNotFoundError:
-    TEMPLATE_HTML = ""
+def _template_candidates() -> list[Path]:
+    """Return possible template locations, ordered by preference."""
+    candidates: list[Path] = []
+
+    configured_path = Path(Config.DIGEST_TEMPLATE_PATH).expanduser()
+    if not configured_path.is_absolute():
+        repo_root = Path(__file__).resolve().parents[2]
+        configured_path = (repo_root / configured_path).resolve()
+    candidates.append(configured_path)
+
+    fallback_path = Path(__file__).parent / "templates" / "dist" / "digest-template.html"
+    if fallback_path not in candidates:
+        candidates.append(fallback_path)
+
+    return candidates
+
+
+def _load_template_html() -> tuple[str, Optional[Path]]:
+    """Load the digest template HTML from the first available candidate path."""
+    for candidate in _template_candidates():
+        try:
+            html = candidate.read_text(encoding="utf-8")
+            logger.info("Loaded digest template from %s", candidate)
+            return html, candidate
+        except FileNotFoundError:
+            logger.debug("Digest template not found at %s", candidate)
+        except Exception:
+            logger.exception("Failed reading digest template at %s", candidate)
+    return "", None
+
+
+TEMPLATE_HTML, TEMPLATE_PATH = _load_template_html()
 
 
 def build_digest_email(

@@ -13,6 +13,15 @@ echo "=========================================="
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Locate repo root (where .git lives) for Docker build context
+REPO_ROOT="$SCRIPT_DIR"
+while [ "$REPO_ROOT" != "/" ] && [ ! -d "$REPO_ROOT/.git" ]; do
+    REPO_ROOT="$(dirname "$REPO_ROOT")"
+done
+if [ ! -d "$REPO_ROOT/.git" ]; then
+    REPO_ROOT="$SCRIPT_DIR"
+fi
+
 # Check if running as root (we'll use sudo where needed)
 if [ "$EUID" -eq 0 ]; then 
    echo "Please don't run this script as root. It will use sudo when needed."
@@ -47,11 +56,11 @@ if ! docker info > /dev/null 2>&1; then
     echo "⚠️  Docker daemon not accessible. You may need to:"
     echo "   1. Log out and back in (to pick up docker group)"
     echo "   2. Or run: newgrp docker"
-    echo "   3. Then run this script again or manually: docker build -t capmatch-email-digest:prod ."
+    echo "   3. Then run this script again or manually: docker build -f services/email-digest/Dockerfile -t capmatch-email-digest:prod ."
     exit 1
 fi
 
-docker build -t capmatch-email-digest:prod .
+docker build -f "$REPO_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$REPO_ROOT"
 echo "✓ Docker image built successfully"
 
 echo ""

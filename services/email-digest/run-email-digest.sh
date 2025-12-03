@@ -6,7 +6,7 @@
 # Ensure you have:
 # - Docker installed and your user in the docker group
 # - .env file in this directory with required environment variables
-# - Docker image built: docker build -t capmatch-email-digest:prod .
+# - Docker image built: docker build -f services/email-digest/Dockerfile -t capmatch-email-digest:prod .
 
 set -e
 

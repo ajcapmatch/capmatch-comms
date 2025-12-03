@@ -4,6 +4,8 @@ steps:
     args:
       [
         "build",
+        "-f",
+        "services/email-digest/Dockerfile",
         "-t",
         "us-central1-docker.pkg.dev/$PROJECT_ID/email-digest/email-digest:$COMMIT_SHA",
         "."
