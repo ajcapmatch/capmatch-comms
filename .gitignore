@@ -12,6 +12,7 @@ venv/
 .env
 .env.*
 .env.local
+!.env.template
 
 # Dependency artifacts
 poetry.lock
