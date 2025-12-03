@@ -28,12 +28,17 @@ if [ -d "$GIT_ROOT/.git" ]; then
 else
     echo ""
     echo "⚠️  Not a git repository, skipping git pull"
-    GIT_ROOT="$SCRIPT_DIR"
 fi
 
 echo ""
 echo "Step 2: Rebuilding Docker image..."
-docker build -f "$GIT_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$GIT_ROOT"
+if [ -d "$GIT_ROOT/.git" ]; then
+    # Building from repo root (preferred case)
+    docker build -f "$GIT_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$GIT_ROOT"
+else
+    # Fallback: build from this service directory only
+    docker build -f "$SCRIPT_DIR/Dockerfile" -t capmatch-email-digest:prod "$SCRIPT_DIR"
+fi
 echo "✓ Docker image rebuilt"
 
 echo ""

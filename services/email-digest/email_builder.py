@@ -21,8 +21,10 @@ def _template_candidates() -> list[Path]:
 
     configured_path = Path(Config.DIGEST_TEMPLATE_PATH).expanduser()
     if not configured_path.is_absolute():
-        repo_root = Path(__file__).resolve().parents[2]
-        configured_path = (repo_root / configured_path).resolve()
+        # Interpret relative paths as relative to the application root (/app),
+        # where this module lives in the Docker image.
+        app_root = Path(__file__).resolve().parent
+        configured_path = (app_root / configured_path).resolve()
     candidates.append(configured_path)
 
     fallback_path = Path(__file__).parent / "templates" / "dist" / "digest-template.html"

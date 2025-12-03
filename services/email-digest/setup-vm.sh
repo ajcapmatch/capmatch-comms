@@ -18,7 +18,11 @@ REPO_ROOT="$SCRIPT_DIR"
 while [ "$REPO_ROOT" != "/" ] && [ ! -d "$REPO_ROOT/.git" ]; do
     REPO_ROOT="$(dirname "$REPO_ROOT")"
 done
-if [ ! -d "$REPO_ROOT/.git" ]; then
+
+HAS_GIT_ROOT=false
+if [ -d "$REPO_ROOT/.git" ]; then
+    HAS_GIT_ROOT=true
+else
     REPO_ROOT="$SCRIPT_DIR"
 fi
 
@@ -60,7 +64,13 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-docker build -f "$REPO_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$REPO_ROOT"
+if [ "$HAS_GIT_ROOT" = true ]; then
+    # Build from repo root so Dockerfile path matches repo layout
+    docker build -f "$REPO_ROOT/services/email-digest/Dockerfile" -t capmatch-email-digest:prod "$REPO_ROOT"
+else
+    # Fallback: build from service directory only
+    docker build -f "$SCRIPT_DIR/Dockerfile" -t capmatch-email-digest:prod "$SCRIPT_DIR"
+fi
 echo "✓ Docker image built successfully"
 
 echo ""
