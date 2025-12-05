@@ -5,7 +5,6 @@ description = "CapMatch org invite email sender service"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi[standard]>=0.123.5",
     "python-dotenv>=1.2.1",
     "resend>=2.19.0",
     "supabase>=2.24.0",
