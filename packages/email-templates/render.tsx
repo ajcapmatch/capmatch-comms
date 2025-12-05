@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { render } from "@react-email/render";
 import DigestEmail, { DigestTemplateData } from "./DigestEmail.js";
+import InviteEmail, { InviteTemplateData } from "./InviteEmail.js";
 
 const cardBaseStyle =
   "background:#F8FAFF;border-radius:20px;border:1px solid #BFDBFE;padding:24px;margin-bottom:16px;";
@@ -37,7 +38,11 @@ const __dirname = dirname(__filename);
 async function main() {
 const useSampleData = process.env.USE_SAMPLE_DATA === "true";
 
-const sampleData: DigestTemplateData = {
+const distDir = join(__dirname, "dist");
+mkdirSync(distDir, { recursive: true });
+
+// Render Digest Email
+const sampleDigestData: DigestTemplateData = {
   previewText: "3 updates across Downtown Highrise",
   userName: "Cody Field",
   digestDateLabel: "November 27, 2025",
@@ -46,24 +51,41 @@ const sampleData: DigestTemplateData = {
   projectSectionsHtml: sampleProjectSections,
 };
 
-const html = await render(
-  <DigestEmail {...(useSampleData ? sampleData : {})} />,
+const digestHtml = await render(
+  <DigestEmail {...(useSampleData ? sampleDigestData : {})} />,
   {
     pretty: true,
   }
 );
 
-  const distDir = join(__dirname, "dist");
-  mkdirSync(distDir, { recursive: true });
+const digestOutputPath = join(distDir, "digest-template.html");
+writeFileSync(digestOutputPath, digestHtml, { encoding: "utf-8" });
+console.log(`Digest template rendered to ${digestOutputPath}`);
 
-  const outputPath = join(distDir, "digest-template.html");
-  writeFileSync(outputPath, html, { encoding: "utf-8" });
+// Render Invite Email
+const sampleInviteData: InviteTemplateData = {
+  previewText: "You've been invited to join Acme Capital on CapMatch",
+  inviteeName: "Alex Johnson",
+  orgName: "Acme Capital",
+  invitedByName: "Sarah Chen",
+  acceptUrl: "https://capmatch.com/accept-invite?token=abc123",
+  expiresText: "December 15, 2025",
+};
 
-  console.log(`Digest template rendered to ${outputPath}`);
+const inviteHtml = await render(
+  <InviteEmail {...(useSampleData ? sampleInviteData : {})} />,
+  {
+    pretty: true,
+  }
+);
+
+const inviteOutputPath = join(distDir, "invite-template.html");
+writeFileSync(inviteOutputPath, inviteHtml, { encoding: "utf-8" });
+console.log(`Invite template rendered to ${inviteOutputPath}`);
 }
 
 main().catch((err) => {
-  console.error("Failed to render digest template:", err);
+  console.error("Failed to render email templates:", err);
   process.exit(1);
 });
 

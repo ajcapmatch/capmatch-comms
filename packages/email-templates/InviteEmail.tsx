@@ -22,28 +22,26 @@ const backgroundColor = "#FFFFFF";
 const borderColor = "#E5E7EB";
 const fontStack = "'TASA Orbiter', 'Inter', 'Helvetica Neue', Arial, sans-serif";
 
-export const PROJECT_SECTIONS_MARKER = "<!--PROJECT_SECTIONS-->";
-
-export type DigestTemplateData = {
+export type InviteTemplateData = {
   previewText: string;
-  userName: string;
-  digestDateLabel: string;
-  ctaUrl: string;
-  managePrefsUrl: string;
-  projectSectionsHtml: string;
+  inviteeName: string;
+  orgName: string;
+  invitedByName: string;
+  acceptUrl: string;
+  expiresText: string;
 };
 
-const defaultTemplateData: DigestTemplateData = {
+const defaultTemplateData: InviteTemplateData = {
   previewText: "{{PREVIEW_TEXT}}",
-  userName: "{{USER_NAME}}",
-  digestDateLabel: "{{DIGEST_DATE}}",
-  ctaUrl: "{{CTA_URL}}",
-  managePrefsUrl: "{{MANAGE_PREFS_URL}}",
-  projectSectionsHtml: PROJECT_SECTIONS_MARKER,
+  inviteeName: "{{INVITEE_NAME}}",
+  orgName: "{{ORG_NAME}}",
+  invitedByName: "{{INVITED_BY_NAME}}",
+  acceptUrl: "{{ACCEPT_URL}}",
+  expiresText: "{{EXPIRES_TEXT}}",
 };
 
-export default function DigestEmail(props: Partial<DigestTemplateData>) {
-  const data: DigestTemplateData = { ...defaultTemplateData, ...props };
+export default function InviteEmail(props: Partial<InviteTemplateData>) {
+  const data: InviteTemplateData = { ...defaultTemplateData, ...props };
 
   return (
     <Html>
@@ -72,13 +70,9 @@ export default function DigestEmail(props: Partial<DigestTemplateData>) {
                 font-size: 16px !important;
                 line-height: 24px !important;
               }
-              .hero {
+              .invitation-card {
                 padding: 28px 20px !important;
-                border-radius: 12px !important;
-              }
-              .hero-copy {
-                font-size: 17px !important;
-                line-height: 26px !important;
+                border-radius: 16px !important;
               }
               .cta-section {
                 padding: 0 !important;
@@ -119,49 +113,48 @@ export default function DigestEmail(props: Partial<DigestTemplateData>) {
 
           {/* Main Content */}
           <Section style={contentWrapper} className="content-wrapper">
+            {/* Greeting */}
+            <Text style={greeting}>Hello {data.inviteeName},</Text>
+
             {/* Main Heading */}
             <Heading style={mainHeading} className="main-heading">
-              Daily Digest
+              You&apos;re Invited
             </Heading>
 
             {/* Subheading */}
             <Text style={subheading} className="subheading">
-              Important activity across your projects.
+              Join your team on CapMatch
             </Text>
 
-            {/* Hero Section */}
-            <Section style={hero} className="hero">
-              <Text style={heroCopy} className="hero-copy">
-                Hey <span style={heroUser}>{data.userName}</span>, here&apos;s what happened on{" "}
-                <strong>{data.digestDateLabel}</strong>.
+            {/* Invitation Card */}
+            <Section style={invitationCard} className="invitation-card">
+              <Text style={cardText}>
+                <strong>{data.invitedByName}</strong> has invited you to join{" "}
+                <strong style={orgNameStyle}>{data.orgName}</strong> on CapMatch.
+              </Text>
+              <Text style={cardTextSecondary}>
+                CapMatch is the platform for connecting borrowers and lenders in commercial real estate.
               </Text>
             </Section>
 
-          <Section>
-            <div
-              dangerouslySetInnerHTML={{
-                __html: data.projectSectionsHtml,
-              }}
-            />
-          </Section>
-
+            {/* CTA Button */}
             <Section style={ctaSection} className="cta-section">
-              <Link href={data.ctaUrl} style={ctaButton} className="cta-button">
-                Open CapMatch →
+              <Link href={data.acceptUrl} style={ctaButton} className="cta-button">
+                Accept Invitation
               </Link>
             </Section>
 
+            {/* Expiry Notice */}
+            <Text style={expiryText}>
+              This invitation expires on <strong>{data.expiresText}</strong>.
+            </Text>
+
             <Hr style={divider} />
 
-            <Section style={footer}>
-              <Text style={footerText}>
-                You&apos;re receiving this email because digest alerts are enabled.{" "}
-                <Link href={data.managePrefsUrl} style={footerLink}>
-                  Manage preferences
-                </Link>
-                .
-              </Text>
-            </Section>
+            {/* Footer */}
+            <Text style={footerText}>
+              If you weren&apos;t expecting this invitation, you can safely ignore this email.
+            </Text>
           </Section>
         </Container>
       </Body>
@@ -203,6 +196,14 @@ const contentWrapper: CSSProperties = {
   backgroundColor: backgroundColor,
 };
 
+const greeting: CSSProperties = {
+  fontSize: "16px",
+  lineHeight: "24px",
+  color: textColor,
+  margin: "0 0 24px 0",
+  fontWeight: 400,
+};
+
 const mainHeading: CSSProperties = {
   fontSize: "36px",
   lineHeight: "40px",
@@ -222,7 +223,7 @@ const subheading: CSSProperties = {
   fontWeight: 400,
 };
 
-const hero: CSSProperties = {
+const invitationCard: CSSProperties = {
   backgroundColor: "#F8FAFF",
   borderRadius: "12px",
   padding: "32px",
@@ -231,17 +232,25 @@ const hero: CSSProperties = {
   textAlign: "center",
 };
 
-const heroCopy: CSSProperties = {
+const cardText: CSSProperties = {
   fontSize: "17px",
   lineHeight: "26px",
   color: textColor,
-  margin: "0",
+  margin: "0 0 16px 0",
   fontWeight: 400,
 };
 
-const heroUser: CSSProperties = {
-  color: textColor,
+const orgNameStyle: CSSProperties = {
+  color: primaryBlue,
   fontWeight: 600,
+};
+
+const cardTextSecondary: CSSProperties = {
+  fontSize: "15px",
+  lineHeight: "22px",
+  color: textColorMuted,
+  margin: "0",
+  fontWeight: 400,
 };
 
 const ctaSection: CSSProperties = {
@@ -253,7 +262,7 @@ const ctaSection: CSSProperties = {
 
 const ctaButton: CSSProperties = {
   backgroundColor: primaryBlue,
-  color: "#000000",
+  color: "#FFFFFF",
   padding: "14px 32px",
   borderRadius: "8px",
   fontWeight: 600,
@@ -267,20 +276,19 @@ const ctaButton: CSSProperties = {
   maxWidth: "100%",
 };
 
-const ctaHint: CSSProperties = {
-  color: textColor,
-  fontSize: "13px",
-  marginTop: "12px",
+const expiryText: CSSProperties = {
+  fontSize: "14px",
+  lineHeight: "20px",
+  color: textColorMuted,
+  margin: "0 0 24px 0",
+  textAlign: "center",
+  fontWeight: 400,
 };
 
 const divider: CSSProperties = {
   borderColor: borderColor,
   margin: "32px 0 24px 0",
   borderWidth: "1px",
-};
-
-const footer: CSSProperties = {
-  textAlign: "center",
 };
 
 const footerText: CSSProperties = {
@@ -291,9 +299,3 @@ const footerText: CSSProperties = {
   textAlign: "center",
   fontWeight: 400,
 };
-
-const footerLink: CSSProperties = {
-  color: primaryBlue,
-  textDecoration: "none",
-};
-

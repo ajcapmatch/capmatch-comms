@@ -30,13 +30,9 @@
           font-size: 16px !important;
           line-height: 24px !important;
         }
-        .hero {
+        .invitation-card {
           padding: 28px 20px !important;
-          border-radius: 12px !important;
-        }
-        .hero-copy {
-          font-size: 17px !important;
-          line-height: 26px !important;
+          border-radius: 16px !important;
         }
         .cta-section {
           padding: 0 !important;
@@ -127,15 +123,20 @@
                       <tbody>
                         <tr>
                           <td>
+                            <p
+                              style="font-size:16px;line-height:24px;color:#111827;margin:0 0 24px 0;font-weight:400;margin-top:0;margin-right:0;margin-bottom:24px;margin-left:0">
+                              Hello
+                              <!-- -->{{INVITEE_NAME}}<!-- -->,
+                            </p>
                             <h1
                               class="main-heading"
                               style="font-size:36px;line-height:40px;color:#111827;margin:0 0 12px 0;font-weight:700;text-align:center;letter-spacing:-0.02em">
-                              Daily Digest
+                              You&#x27;re Invited
                             </h1>
                             <p
                               class="subheading"
                               style="font-size:18px;line-height:28px;color:#6B7280;margin:0 0 32px 0;text-align:center;font-weight:400;margin-top:0;margin-right:0;margin-bottom:32px;margin-left:0">
-                              Important activity across your projects.
+                              Join your team on CapMatch
                             </p>
                             <table
                               align="center"
@@ -144,36 +145,27 @@
                               cellpadding="0"
                               cellspacing="0"
                               role="presentation"
-                              class="hero"
+                              class="invitation-card"
                               style="background-color:#F8FAFF;border-radius:12px;padding:32px;margin:0 0 32px 0;border:1px solid #E5E7EB;text-align:center">
                               <tbody>
                                 <tr>
                                   <td>
                                     <p
-                                      class="hero-copy"
-                                      style="font-size:17px;line-height:26px;color:#111827;margin:0;font-weight:400;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
-                                      Hey
-                                      <span
-                                        style="color:#111827;font-weight:600"
-                                        >{{USER_NAME}}</span
-                                      >, here&#x27;s what happened on<!-- -->
-                                      <strong>{{DIGEST_DATE}}</strong>.
+                                      style="font-size:17px;line-height:26px;color:#111827;margin:0 0 16px 0;font-weight:400;margin-top:0;margin-right:0;margin-bottom:16px;margin-left:0">
+                                      <strong>{{INVITED_BY_NAME}}</strong> has
+                                      invited you to join<!-- -->
+                                      <strong
+                                        style="color:#007BFF;font-weight:600"
+                                        >{{ORG_NAME}}</strong
+                                      >
+                                      on CapMatch.
                                     </p>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <table
-                              align="center"
-                              width="100%"
-                              border="0"
-                              cellpadding="0"
-                              cellspacing="0"
-                              role="presentation">
-                              <tbody>
-                                <tr>
-                                  <td>
-                                    <div><!--PROJECT_SECTIONS--></div>
+                                    <p
+                                      style="font-size:15px;line-height:22px;color:#6B7280;margin:0;font-weight:400;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
+                                      CapMatch is the platform for connecting
+                                      borrowers and lenders in commercial real
+                                      estate.
+                                    </p>
                                   </td>
                                 </tr>
                               </tbody>
@@ -191,44 +183,28 @@
                                 <tr>
                                   <td>
                                     <a
-                                      href="{{CTA_URL}}"
+                                      href="{{ACCEPT_URL}}"
                                       class="cta-button"
-                                      style="color:#000000;text-decoration-line:none;background-color:#007BFF;padding:14px 32px;border-radius:8px;font-weight:600;text-decoration:none;display:inline-block;font-size:16px;line-height:24px;transition:background-color 0.2s ease;box-shadow:0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);box-sizing:border-box;max-width:100%"
+                                      style="color:#FFFFFF;text-decoration-line:none;background-color:#007BFF;padding:14px 32px;border-radius:8px;font-weight:600;text-decoration:none;display:inline-block;font-size:16px;line-height:24px;transition:background-color 0.2s ease;box-shadow:0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);box-sizing:border-box;max-width:100%"
                                       target="_blank"
-                                      >Open CapMatch →</a
+                                      >Accept Invitation</a
                                     >
                                   </td>
                                 </tr>
                               </tbody>
                             </table>
+                            <p
+                              style="font-size:14px;line-height:20px;color:#6B7280;margin:0 0 24px 0;text-align:center;font-weight:400;margin-top:0;margin-right:0;margin-bottom:24px;margin-left:0">
+                              This invitation expires on
+                              <strong>{{EXPIRES_TEXT}}</strong>.
+                            </p>
                             <hr
                               style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:#E5E7EB;margin:32px 0 24px 0;border-width:1px" />
-                            <table
-                              align="center"
-                              width="100%"
-                              border="0"
-                              cellpadding="0"
-                              cellspacing="0"
-                              role="presentation"
-                              style="text-align:center">
-                              <tbody>
-                                <tr>
-                                  <td>
-                                    <p
-                                      style="font-size:13px;line-height:20px;color:#6B7280;margin:0;text-align:center;font-weight:400;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
-                                      You&#x27;re receiving this email because
-                                      digest alerts are enabled.<!-- -->
-                                      <a
-                                        href="{{MANAGE_PREFS_URL}}"
-                                        style="color:#007BFF;text-decoration-line:none;text-decoration:none"
-                                        target="_blank"
-                                        >Manage preferences</a
-                                      >.
-                                    </p>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                            <p
+                              style="font-size:13px;line-height:20px;color:#6B7280;margin:0;text-align:center;font-weight:400;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
+                              If you weren&#x27;t expecting this invitation, you
+                              can safely ignore this email.
+                            </p>
                           </td>
                         </tr>
                       </tbody>
