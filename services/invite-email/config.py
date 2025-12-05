@@ -23,7 +23,6 @@ class Config:
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "notifications@capmatch.com")
     RESEND_TEST_MODE: bool = os.getenv("RESEND_TEST_MODE", "true").lower() == "true"
     RESEND_TEST_RECIPIENT: Optional[str] = os.getenv("RESEND_TEST_RECIPIENT")
-    RESEND_FORCE_TO_EMAIL: Optional[str] = os.getenv("RESEND_FORCE_TO_EMAIL")
     INVITE_EMAIL_DRY_RUN: bool = os.getenv("INVITE_EMAIL_DRY_RUN", "true").lower() == "true"
 
     # Template path

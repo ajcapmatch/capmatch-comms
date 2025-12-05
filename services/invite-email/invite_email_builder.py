@@ -87,30 +87,17 @@ def build_invite_email(
     text_body = "\n".join(text_lines)
 
     # Build HTML body
-    if TEMPLATE_HTML:
-        # Use template if available
-        html_body = (
-            TEMPLATE_HTML.replace("{{INVITEE_NAME}}", display_invitee)
-            .replace("{{ORG_NAME}}", display_org)
-            .replace("{{INVITED_BY_NAME}}", inviter)
-            .replace("{{ACCEPT_URL}}", accept_url)
-            .replace("{{EXPIRES_TEXT}}", expires_text)
-        )
-    else:
-        # Generate simple HTML if template is missing (for testing)
-        logger.warning("Template not available; generating simple HTML email body")
-        html_body = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-  <h2>You're Invited to Join {display_org} on CapMatch</h2>
-  <p>Hi {display_invitee},</p>
-  <p>You've been invited to join {display_org} on CapMatch by {inviter}.</p>
-  <p><a href="{accept_url}" style="background-color: #3B82F6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Accept Invite</a></p>
-  <p>This invite will expire on {expires_text}.</p>
-  <p style="color: #666; font-size: 0.9em;">If you weren't expecting this, you can ignore this email.</p>
-</body>
-</html>"""
+    if not TEMPLATE_HTML:
+        logger.error("Invite template HTML not available; cannot build email.")
+        return None, None
+
+    html_body = (
+        TEMPLATE_HTML.replace("{{INVITEE_NAME}}", display_invitee)
+        .replace("{{ORG_NAME}}", display_org)
+        .replace("{{INVITED_BY_NAME}}", inviter)
+        .replace("{{ACCEPT_URL}}", accept_url)
+        .replace("{{EXPIRES_TEXT}}", expires_text)
+    )
 
     return html_body, text_body
 

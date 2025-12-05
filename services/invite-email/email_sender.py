@@ -36,8 +36,6 @@ def _ensure_resend_api_key() -> None:
 
 def _determine_recipient(user_email: str) -> str:
     """Return the email address Resend should target for this run."""
-    if Config.RESEND_FORCE_TO_EMAIL:
-        return Config.RESEND_FORCE_TO_EMAIL
     if Config.RESEND_TEST_MODE:
         if Config.RESEND_TEST_RECIPIENT:
             return Config.RESEND_TEST_RECIPIENT
@@ -117,17 +115,21 @@ def _send_with_throttle_retry(params: dict) -> bool:
             message_id = response.get("id")
             logger.info("Resend send complete (id=%s)", message_id)
             return message_id is not None
-        except resend_exceptions.RateLimitError as rate_err:  # type: ignore[union-attr]
-            logger.warning(
-                "Resend rate limit hit (attempt %d/%d): %s",
-                attempt,
-                MAX_RETRIES,
-                rate_err,
-            )
-            if attempt == MAX_RETRIES:
+        except resend_exceptions.ResendError as err:  # type: ignore[union-attr]
+            # Check if it's a rate limit error (429) by examining the error
+            error_str = str(err).lower()
+            if "rate" in error_str or "429" in error_str or "limit" in error_str:
+                logger.warning(
+                    "Resend rate limit hit (attempt %d/%d): %s",
+                    attempt,
+                    MAX_RETRIES,
+                    err,
+                )
+                if attempt == MAX_RETRIES:
+                    raise
+            else:
+                # For other Resend errors (validation, etc.), raise immediately
                 raise
-        except resend_exceptions.ResendError:  # type: ignore[union-attr]
-            raise
     return False
 
 
