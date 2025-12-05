@@ -12,21 +12,37 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
-def _load_template_html() -> tuple[str, Optional[Path]]:
-    """Load the invite template HTML from configured path."""
-    configured = Path(Config.INVITE_TEMPLATE_PATH).expanduser()
-    if not configured.is_absolute():
-        app_root = Path(__file__).resolve().parent
-        configured = (app_root / configured).resolve()
+def _template_candidates() -> list[Path]:
+    """Return possible template locations, ordered by preference."""
+    candidates: list[Path] = []
 
-    try:
-        html = configured.read_text(encoding="utf-8")
-        logger.info("Loaded invite template from %s", configured)
-        return html, configured
-    except FileNotFoundError:
-        logger.error("Invite template HTML not found at %s", configured)
-    except Exception:
-        logger.exception("Failed reading invite template at %s", configured)
+    configured_path = Path(Config.INVITE_TEMPLATE_PATH).expanduser()
+    if not configured_path.is_absolute():
+        # Interpret relative paths as relative to the application root (/app),
+        # where this module lives in the Docker image.
+        app_root = Path(__file__).resolve().parent
+        configured_path = (app_root / configured_path).resolve()
+    candidates.append(configured_path)
+
+    # Fallback: legacy location (for backwards compatibility)
+    fallback_path = Path(__file__).parent / "templates" / "dist" / "invite-template.html"
+    if fallback_path not in candidates:
+        candidates.append(fallback_path)
+
+    return candidates
+
+
+def _load_template_html() -> tuple[str, Optional[Path]]:
+    """Load the invite template HTML from the first available candidate path."""
+    for candidate in _template_candidates():
+        try:
+            html = candidate.read_text(encoding="utf-8")
+            logger.info("Loaded invite template from %s", candidate)
+            return html, candidate
+        except FileNotFoundError:
+            logger.debug("Invite template not found at %s", candidate)
+        except Exception:
+            logger.exception("Failed reading invite template at %s", candidate)
     return "", None
 
 
@@ -45,12 +61,8 @@ def build_invite_email(
     """
     Build invite email bodies.
 
-    Returns (html_body, text_body) or (None, None) if template is unavailable.
+    Returns (html_body, text_body). If template is unavailable, generates simple HTML/text.
     """
-    if not TEMPLATE_HTML:
-        logger.error("Invite template HTML not available; cannot build email.")
-        return None, None
-
     display_invitee = invitee_name or invited_email
     display_org = org_name or "CapMatch"
     inviter = invited_by_name or "a member of your team"
@@ -60,14 +72,7 @@ def build_invite_email(
         else "soon"
     )
 
-    html_body = (
-        TEMPLATE_HTML.replace("{{INVITEE_NAME}}", display_invitee)
-        .replace("{{ORG_NAME}}", display_org)
-        .replace("{{INVITED_BY_NAME}}", inviter)
-        .replace("{{ACCEPT_URL}}", accept_url)
-        .replace("{{EXPIRES_TEXT}}", expires_text)
-    )
-
+    # Build text body (always available)
     text_lines = [
         f"Hi {display_invitee},",
         "",
@@ -79,7 +84,34 @@ def build_invite_email(
         "",
         "If you weren't expecting this, you can ignore this email.",
     ]
+    text_body = "\n".join(text_lines)
 
-    return html_body, "\n".join(text_lines)
+    # Build HTML body
+    if TEMPLATE_HTML:
+        # Use template if available
+        html_body = (
+            TEMPLATE_HTML.replace("{{INVITEE_NAME}}", display_invitee)
+            .replace("{{ORG_NAME}}", display_org)
+            .replace("{{INVITED_BY_NAME}}", inviter)
+            .replace("{{ACCEPT_URL}}", accept_url)
+            .replace("{{EXPIRES_TEXT}}", expires_text)
+        )
+    else:
+        # Generate simple HTML if template is missing (for testing)
+        logger.warning("Template not available; generating simple HTML email body")
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <h2>You're Invited to Join {display_org} on CapMatch</h2>
+  <p>Hi {display_invitee},</p>
+  <p>You've been invited to join {display_org} on CapMatch by {inviter}.</p>
+  <p><a href="{accept_url}" style="background-color: #3B82F6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Accept Invite</a></p>
+  <p>This invite will expire on {expires_text}.</p>
+  <p style="color: #666; font-size: 0.9em;">If you weren't expecting this, you can ignore this email.</p>
+</body>
+</html>"""
+
+    return html_body, text_body
 
 

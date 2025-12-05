@@ -56,7 +56,7 @@ def send_invite_email(
     text_body: str,
     org_name: Optional[str],
 ) -> bool:
-    """Send invite email via Resend. Returns True if accepted by Resend."""
+    """Send invite email (or log-only in dry-run mode)."""
     to_address = _determine_recipient(user_email)
 
     subject_org = f" to {org_name}" if org_name else ""
@@ -71,6 +71,13 @@ def send_invite_email(
     logger.info("-" * 80)
     logger.info("Text Body:\n%s", text_body)
     logger.info("=" * 80)
+
+    if Config.INVITE_EMAIL_DRY_RUN:
+        logger.info(
+            "INVITE_EMAIL_DRY_RUN=true -> not sending email to Resend; "
+            "this is a log-only dry run."
+        )
+        return True
 
     try:
         _ensure_resend_api_key()

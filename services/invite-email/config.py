@@ -24,6 +24,7 @@ class Config:
     RESEND_TEST_MODE: bool = os.getenv("RESEND_TEST_MODE", "true").lower() == "true"
     RESEND_TEST_RECIPIENT: Optional[str] = os.getenv("RESEND_TEST_RECIPIENT")
     RESEND_FORCE_TO_EMAIL: Optional[str] = os.getenv("RESEND_FORCE_TO_EMAIL")
+    INVITE_EMAIL_DRY_RUN: bool = os.getenv("INVITE_EMAIL_DRY_RUN", "true").lower() == "true"
 
     # Template path
     INVITE_TEMPLATE_PATH: str = os.getenv(
@@ -31,8 +32,11 @@ class Config:
         str(DEFAULT_INVITE_TEMPLATE_PATH),
     )
 
-    # Auth between Supabase edge function and this service
-    INVITE_WEBHOOK_SECRET: str = os.getenv("INVITE_WEBHOOK_SECRET", "")
+    # Polling configuration
+    POLL_INTERVAL_SECONDS: int = int(os.getenv("POLL_INTERVAL_SECONDS", "60"))
+
+    # App base URL (for building accept-invite links)
+    APP_BASE_URL: str = os.getenv("APP_BASE_URL")
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -43,9 +47,13 @@ class Config:
             raise ValueError("SUPABASE_URL environment variable is required")
         if not cls.SUPABASE_SERVICE_ROLE_KEY:
             raise ValueError("SUPABASE_SERVICE_ROLE_KEY environment variable is required")
-        if not cls.RESEND_API_KEY:
-            raise ValueError("RESEND_API_KEY environment variable is required")
-        if not cls.INVITE_WEBHOOK_SECRET:
-            raise ValueError("INVITE_WEBHOOK_SECRET environment variable is required")
+        if cls.POLL_INTERVAL_SECONDS < 1:
+            raise ValueError("POLL_INTERVAL_SECONDS must be at least 1")
+        if not cls.APP_BASE_URL:
+            import logging
+            logging.getLogger(__name__).warning(
+                "APP_BASE_URL not set; accept-invite links will be incomplete"
+            )
+
 
 
