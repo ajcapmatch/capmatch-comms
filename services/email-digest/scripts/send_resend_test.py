@@ -24,7 +24,7 @@ SCENARIOS = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Send a sample email via Resend using sandbox recipients."
+        description="Send a sample email via Resend using sandbox recipients or a custom email."
     )
     parser.add_argument(
         "--scenario",
@@ -32,10 +32,17 @@ def main() -> None:
         default="delivered",
         help="Resend sandbox behavior to exercise.",
     )
+    parser.add_argument(
+        "--email",
+        type=str,
+        default=None,
+        help="Send to a custom email address instead of sandbox recipient.",
+    )
     args = parser.parse_args()
 
-    recipient = SCENARIOS[args.scenario]
-    print(f"Sending digest sample to {recipient} (scenario={args.scenario})")
+    recipient = args.email if args.email else SCENARIOS[args.scenario]
+    scenario_info = f" (scenario={args.scenario})" if not args.email else ""
+    print(f"Sending digest sample to {recipient}{scenario_info}")
 
     sample_events = [
         {

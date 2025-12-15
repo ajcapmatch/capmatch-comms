@@ -27,6 +27,13 @@ def _template_candidates() -> list[Path]:
         configured_path = (app_root / configured_path).resolve()
     candidates.append(configured_path)
 
+    # Fallback: look for template relative to repo root (for local dev)
+    # Go up from services/email-digest to repo root, then to packages/email-templates/dist/
+    repo_root_fallback = Path(__file__).resolve().parent.parent.parent / "packages" / "email-templates" / "dist" / "digest-template.html"
+    if repo_root_fallback not in candidates:
+        candidates.append(repo_root_fallback)
+
+    # Another fallback: templates directory relative to this file
     fallback_path = Path(__file__).parent / "templates" / "dist" / "digest-template.html"
     if fallback_path not in candidates:
         candidates.append(fallback_path)

@@ -116,15 +116,19 @@ def _send_with_throttle_retry(params: dict) -> bool:
             message_id = response.get("id")
             logger.info("Resend send complete (id=%s)", message_id)
             return message_id is not None
-        except resend_exceptions.RateLimitError as rate_err:
-            logger.warning(
-                "Resend rate limit hit (attempt %d/%d): %s",
-                attempt,
-                MAX_RETRIES,
-                rate_err,
-            )
-            if attempt == MAX_RETRIES:
+        except resend_exceptions.ResendError as err:
+            # Check if it's a rate limit error (429) by examining the error
+            error_str = str(err).lower()
+            if "rate" in error_str or "429" in error_str or "limit" in error_str:
+                logger.warning(
+                    "Resend rate limit hit (attempt %d/%d): %s",
+                    attempt,
+                    MAX_RETRIES,
+                    err,
+                )
+                if attempt == MAX_RETRIES:
+                    raise
+            else:
+                # For other Resend errors (validation, etc.), raise immediately
                 raise
-        except resend_exceptions.ResendError:
-            raise
     return False
