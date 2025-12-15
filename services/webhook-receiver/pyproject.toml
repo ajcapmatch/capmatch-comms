@@ -1,0 +1,12 @@
+[project]
+name = "webhook-receiver"
+version = "0.1.0"
+description = "Webhook receiver server for Supabase database webhooks"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0.0",
+]
+
+[project.scripts]
+webhook-receiver = "app:main"
+
