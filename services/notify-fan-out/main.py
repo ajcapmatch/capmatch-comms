@@ -1,23 +1,22 @@
 """
 Notify Fan-Out Service
 
-Receives webhooks from Supabase domain_events table and creates
+Processes unprocessed domain_events from Supabase and creates
 notifications in the notifications table.
 
-This service replaces the Supabase Edge Function implementation.
+This script runs once and exits. It should be called periodically
+by a cron job or Cloud Scheduler.
 """
 
 from __future__ import annotations
 
 import logging
 import sys
-
-from flask import Flask, request, jsonify, Response
-from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, timezone
 
 from config import Config
-from database import Database
-from handlers import dispatch_event, HandlerResult
+from database import Database, DomainEvent
+from handlers import dispatch_event
 
 # Configure logging
 logging.basicConfig(
@@ -36,232 +35,99 @@ logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-app = Flask(__name__)
 
-# Global database instance (initialized on first request)
-_db: Optional[Database] = None
-
-
-def get_db() -> Database:
-    """Get or create database instance."""
-    global _db
-    if _db is None:
-        Config.validate()
-        _db = Database(Config.SUPABASE_URL, Config.SUPABASE_SERVICE_ROLE_KEY)
-        logger.info("Database connection initialized")
-    return _db
-
-
-def json_response(
-    body: Dict[str, Any], status: int = 200
-) -> Tuple[Response, int]:
-    """Create a JSON response with CORS headers."""
-    response = jsonify(body)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = (
-        "authorization, x-client-info, apikey, content-type"
-    )
-    return response, status
-
-
-def parse_event_id(value: Any) -> Optional[int]:
-    """Parse event ID from a single value (int or string)."""
-    if isinstance(value, int) and value > 0:
-        return value
-    if isinstance(value, str) and value.strip():
-        try:
-            parsed = int(value)
-            return parsed if parsed > 0 else None
-        except ValueError:
-            return None
-    return None
-
-
-def extract_event_id_from_body(body: Dict[str, Any]) -> Optional[int]:
+def process_event(db: Database, event: DomainEvent) -> bool:
     """
-    Extract the domain_event ID from various payload shapes.
-
-    Supported formats:
-    1) { "eventId": 123 } or { "event_id": 123 }
-    2) Supabase DB webhook style:
-       {
-         "type": "INSERT",
-         "table": "domain_events",
-         "record": { "id": 123, ... }
-       }
-    """
-    # 1. Direct eventId / event_id
-    direct = body.get("eventId") or body.get("event_id")
-    event_id = parse_event_id(direct)
-    if event_id:
-        return event_id
-
-    # 2. Supabase webhook style payload
-    record = body.get("record")
-    if isinstance(record, dict):
-        event_id = parse_event_id(record.get("id"))
-        if event_id:
-            return event_id
-
-    return None
-
-
-@app.route("/", methods=["GET"])
-def health_check():
-    """Health check endpoint."""
-    return json_response({
-        "status": "ok",
-        "service": "notify-fan-out",
-        "version": "1.0.0",
-    })
-
-
-@app.route("/", methods=["OPTIONS"])
-@app.route("/webhook", methods=["OPTIONS"])
-def handle_options():
-    """Handle CORS preflight requests."""
-    response = Response("ok")
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = (
-        "authorization, x-client-info, apikey, content-type"
-    )
-    response.headers["Access-Control-Max-Age"] = "86400"
-    return response
-
-
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    """
-    Main webhook endpoint for processing domain events.
-
-    Expected payloads:
-    1) Direct:
-       { "eventId": <number> } or { "event_id": <number> }
-
-    2) Supabase DB webhook:
-       {
-         "type": "INSERT",
-         "table": "domain_events",
-         "record": { "id": <number>, ... }
-       }
-
-    The service will:
-    1. Fetch the domain event from Supabase
-    2. Dispatch to the appropriate handler based on event_type
-    3. Create notifications in the notifications table
+    Process a single domain event.
+    
+    Returns True if successfully processed, False otherwise.
     """
     try:
-        # Validate authorization header (optional shared secret)
-        # If WEBHOOK_SECRET is set, require a matching Bearer token.
-        # If not set, allow requests without any Authorization header.
-        auth_header = request.headers.get("Authorization")
-        if Config.WEBHOOK_SECRET:
-            expected = f"Bearer {Config.WEBHOOK_SECRET}"
-            if auth_header != expected:
-                logger.warning("Invalid or missing authorization header")
-                return json_response({"error": "Unauthorized"}, 401)
-
-        # Parse request body
-        body = request.get_json(silent=True) or {}
-
-        # Extract event ID from supported payload shapes
-        event_id = extract_event_id_from_body(body)
-
-        if not event_id:
-            logger.warning("Missing or invalid eventId in request")
-            return json_response({"error": "eventId is required"}, 400)
-
-        logger.info("Processing event: %d", event_id)
-
-        # Get database instance
-        db = get_db()
-
-        # Fetch the domain event
-        event = db.get_domain_event(event_id)
-        if not event:
-            logger.warning("Event not found: %d", event_id)
-            return json_response({"error": "domain_event not found"}, 404)
-
         logger.info(
-            "Dispatching event: id=%d, type=%s, project=%s",
+            "Processing event: id=%d, type=%s, project=%s",
             event.id,
             event.event_type,
             event.project_id,
         )
 
-        # Dispatch to handler
+        # Dispatch to appropriate handler
         result = dispatch_event(db, event)
 
         logger.info(
             "Event processed: id=%d, result=%s",
-            event_id,
+            event.id,
             result.to_dict(),
         )
 
-        # Return appropriate status code
-        if result.error:
-            return json_response(result.to_dict(), 500)
+        # Mark as processed regardless of handler result
+        # (we don't want to reprocess events that were skipped intentionally)
+        if not db.mark_event_processed(event.id):
+            logger.error("Failed to mark event %d as processed", event.id)
+            return False
 
-        return json_response(result.to_dict())
+        return True
 
     except Exception as e:
-        logger.exception("Unexpected error processing webhook")
-        return json_response(
-            {"error": str(e) if str(e) else "Unknown error"},
-            500,
-        )
-
-
-@app.route("/webhook", methods=["GET"])
-def webhook_info():
-    """Info endpoint for webhook."""
-    return json_response({
-        "status": "ok",
-        "message": "Webhook endpoint is ready. Send POST requests here.",
-        "method": "POST",
-        "expected_payload": {
-            "eventId": "<number>",
-        },
-        "supported_events": [
-            "document_uploaded",
-            "chat_message_sent",
-            "meeting_invited",
-            "meeting_updated",
-            "meeting_reminder",
-            "resume_incomplete_nudge",
-        ],
-    })
+        logger.exception("Error processing event %d: %s", event.id, e)
+        return False
 
 
 def main():
-    """Run the Flask development server."""
+    """Main execution function."""
+    start_time = datetime.now(timezone.utc)
     logger.info("=" * 80)
-    logger.info("Starting Notify Fan-Out Service")
+    logger.info("Starting Notify Fan-Out Job")
+    logger.info(f"Started at: {start_time.isoformat()}")
     logger.info("=" * 80)
 
     try:
+        # Validate configuration
         Config.validate()
         logger.info("Configuration validated")
-    except ValueError as e:
-        logger.error("Configuration error: %s", e)
+
+        # Initialize database
+        db = Database(Config.SUPABASE_URL, Config.SUPABASE_SERVICE_ROLE_KEY)
+        logger.info("Connected to Supabase at %s", Config.SUPABASE_URL)
+
+        # Process events in batches
+        processed = 0
+        failed = 0
+        batch_size = 100
+
+        while True:
+            events = db.get_unprocessed_events(limit=batch_size)
+            
+            if not events:
+                logger.info("No unprocessed events found")
+                break
+
+            logger.info("Found %d unprocessed event(s)", len(events))
+
+            for event in events:
+                if process_event(db, event):
+                    processed += 1
+                else:
+                    failed += 1
+
+            # If we got fewer events than the batch size, we're done
+            if len(events) < batch_size:
+                break
+
+        # Summary
+        end_time = datetime.now(timezone.utc)
+        duration = (end_time - start_time).total_seconds()
+
+        logger.info("=" * 80)
+        logger.info("Notify Fan-Out Job completed")
+        logger.info(f"Duration: {duration:.2f} seconds")
+        logger.info(f"Events processed: {processed}")
+        logger.info(f"Events failed: {failed}")
+        logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"Fatal error in notify fan-out job: {e}", exc_info=True)
         sys.exit(1)
-
-    logger.info("Server running on: http://%s:%d", Config.HOST, Config.PORT)
-    logger.info("Webhook endpoint: http://%s:%d/webhook", Config.HOST, Config.PORT)
-    logger.info("=" * 80)
-
-    # Disable Flask's default request logging in production
-    import logging as flask_logging
-    flask_logging.getLogger("werkzeug").setLevel(flask_logging.WARNING)
-
-    app.run(
-        host=Config.HOST,
-        port=Config.PORT,
-        debug=False,
-    )
 
 
 if __name__ == "__main__":
     main()
-

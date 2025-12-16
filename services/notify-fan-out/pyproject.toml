@@ -1,16 +1,13 @@
 [project]
 name = "notify-fan-out"
 version = "1.0.0"
-description = "CapMatch notification fan-out service - receives domain events and creates notifications"
+description = "CapMatch notification fan-out service - polls domain events and creates notifications"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "flask>=3.0.0",
-    "gunicorn>=23.0.0",
     "python-dotenv>=1.0.0",
     "supabase>=2.24.0",
 ]
 
 [project.scripts]
 notify-fan-out = "main:main"
-

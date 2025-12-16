@@ -23,9 +23,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # 6. Copy service code
 COPY services/notify-fan-out/ .
 
-# Expose port for Cloud Run
-EXPOSE 8080
-
-# Use gunicorn for production
-CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "main:app"]
-
+# Run as polling daemon
+CMD ["uv", "run", "python", "main.py"]

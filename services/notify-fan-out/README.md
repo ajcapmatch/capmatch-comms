@@ -1,15 +1,17 @@
 # Notify Fan-Out Service
 
-A GCP Cloud Run service that receives webhooks from Supabase `domain_events` table and creates notifications in the `notifications` table.
+A cron job that processes unprocessed domain events from Supabase and creates notifications in the `notifications` table.
 
-This service replaces the Supabase Edge Function implementation, providing better scalability, observability, and deployment flexibility on GCP.
+This service runs once per execution and is scheduled by a system cron job to run every minute on a VM.
 
 ## Features
 
+- **Cron-based**: Runs on a schedule via system cron (every minute)
 - **Event-driven notifications**: Processes domain events and creates in-app notifications
 - **Preference-aware**: Respects user notification preferences (muted threads/projects)
 - **Deduplication**: Prevents duplicate notifications for the same event
 - **Aggregation**: Aggregates chat messages into single notifications per thread
+- **Batch processing**: Processes events in batches of 100
 
 ## Supported Events
 
@@ -28,33 +30,29 @@ This service replaces the Supabase Edge Function implementation, providing bette
 |----------|----------|-------------|
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
-| `PORT` | No | Server port (default: 8080) |
-| `HOST` | No | Server host (default: 0.0.0.0) |
-| `WEBHOOK_SECRET` | No | Optional shared secret for webhook auth |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 | `APP_BASE_URL` | No | Base URL for notification links |
 
-## API Endpoints
+## Database Migration
 
-### `GET /`
-Health check endpoint.
+Before running the service, apply the migration to add the `processed_at` column:
 
-### `POST /webhook`
-Main webhook endpoint for processing domain events.
+```sql
+-- Run this in Supabase SQL Editor
+ALTER TABLE public.domain_events 
+ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ DEFAULT NULL;
 
-**Request Body:**
-```json
-{
-  "eventId": 123
-}
+CREATE INDEX IF NOT EXISTS idx_domain_events_unprocessed 
+ON public.domain_events (id) 
+WHERE processed_at IS NULL;
+
+-- Drop the webhook trigger (no longer needed)
+DROP TRIGGER IF EXISTS "domain_events_webhook" ON "public"."domain_events";
 ```
 
-**Response:**
-```json
-{
-  "inserted": 5,
-  "updated": 2
-}
+Or run the migration file:
+```bash
+psql $DATABASE_URL < migrations/001_add_processed_at.sql
 ```
 
 ## Local Development
@@ -66,7 +64,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 LOG_LEVEL=DEBUG
 ```
 
-2. Run the development server:
+2. Run the service once:
 ```bash
 ./scripts/run-dev.sh
 ```
@@ -76,6 +74,13 @@ Or manually:
 uv sync
 uv run python main.py
 ```
+
+3. Set up a local cron job (optional):
+```bash
+./scripts/setup-cron.sh
+```
+
+This will add a cron entry to run the service every minute.
 
 ## Docker
 
@@ -88,80 +93,104 @@ Or manually:
 ```bash
 # From repo root
 docker build -f services/notify-fan-out/Dockerfile -t notify-fan-out .
-docker run --env-file services/notify-fan-out/.env -p 8080:8080 notify-fan-out
+docker run --env-file services/notify-fan-out/.env notify-fan-out
 ```
 
 ## Deployment
 
-### Manual Deploy to Cloud Run
+### VM Deployment
 
+1. **One-time VM setup:**
 ```bash
-./scripts/deploy.sh <PROJECT_ID> [REGION]
+cd services/notify-fan-out
+./setup-vm.sh
 ```
 
-### Cloud Build
+This will:
+- Install Docker and dependencies
+- Build the Docker image
+- Set up a cron job to run every minute
+- Create log file at `/var/log/notify-fan-out.log`
 
-Trigger a build with Cloud Build:
+2. **Create `.env` file** with required variables:
 ```bash
-gcloud builds submit --config services/notify-fan-out/cloudbuild.yaml .
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+LOG_LEVEL=INFO
 ```
 
-### Set Environment Variables
-
-After deployment, set the required environment variables:
+3. **Update after code changes:**
 ```bash
-gcloud run services update notify-fan-out \
-  --region us-west1 \
-  --set-env-vars SUPABASE_URL=<url>,SUPABASE_SERVICE_ROLE_KEY=<key>
+cd services/notify-fan-out
+./deploy.sh
 ```
 
-## Supabase Webhook Configuration
+This will:
+- Pull latest code from git
+- Rebuild the Docker image
 
-Configure a database webhook in Supabase to call this service when new events are inserted into `domain_events`:
+4. **Test manually:**
+```bash
+./run-notify-fan-out.sh
+```
 
-1. Go to Supabase Dashboard → Database → Webhooks
-2. Create new webhook:
-   - **Name**: `notify-fan-out`
-   - **Table**: `domain_events`
-   - **Events**: `INSERT`
-   - **Type**: HTTP Request
-   - **Method**: POST
-   - **URL**: `https://notify-fan-out-xxx.run.app/webhook`
-   - **Headers**: 
-     - `Authorization: Bearer <your-webhook-secret>` (if using WEBHOOK_SECRET)
-     - `Content-Type: application/json`
-   - **Body**: 
-     ```json
-     {
-       "eventId": "{{new.id}}"
-     }
-     ```
+5. **View logs:**
+```bash
+tail -f /var/log/notify-fan-out.log
+```
+
+6. **View cron schedule:**
+```bash
+crontab -l
+```
 
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  domain_events  │────▶│  notify-fan-out  │────▶│  notifications  │
-│     (insert)    │     │   (Cloud Run)    │     │    (insert)     │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-         │                       │
-         │                       ▼
-         │              ┌────────────────┐
-         └──────────────│ Supabase DB    │
-                        │ - profiles     │
-                        │ - projects     │
-                        │ - preferences  │
-                        └────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Cron / Cloud Scheduler                   │
+│                    (runs every minute)                      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Notify Fan-Out Job (runs once)                  │
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────┐                │
+│  │ Fetch Events   │───▶│ Process Events │                │
+│  │ (processed_at  │    │                 │                │
+│  │  IS NULL)      │    │                 │                │
+│  └─────────────────┘    └─────────────────┘                │
+│       │                      │                               │
+│       ▼                      ▼                               │
+└───────┼──────────────────────┼───────────────────────────────┘
+        │                      │
+        ▼                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        Supabase                             │
+│                                                             │
+│  ┌─────────────────┐         ┌─────────────────┐           │
+│  │  domain_events  │         │  notifications  │           │
+│  │                 │         │                 │           │
+│  │ processed_at    │         │                 │           │
+│  │ IS NULL = new   │         │                 │           │
+│  └─────────────────┘         └─────────────────┘           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Migration from Edge Functions
+## How It Works
 
-This service is a 1:1 replacement for the Supabase Edge Function. The main differences:
+1. **Cron/Scheduler**: Triggers the job every minute (or your configured schedule)
+2. **Fetch**: Query `domain_events` where `processed_at IS NULL` (up to 100 at a time)
+3. **Process**: For each event, dispatch to the appropriate handler based on `event_type`
+4. **Notify**: Create notifications in the `notifications` table
+5. **Mark**: Set `processed_at = NOW()` on the event to prevent reprocessing
+6. **Exit**: Job completes and exits
 
-1. **Runtime**: Deno → Python 3.13
-2. **Framework**: Native fetch → Flask
-3. **Supabase Client**: JavaScript SDK → Python SDK
-4. **Deployment**: Supabase Edge → GCP Cloud Run
+## How It Works
 
-All business logic, notification formats, and database queries remain identical.
-
+The service runs as a cron job on a VM:
+- Cron triggers `run-notify-fan-out.sh` every minute
+- The script runs the service in a Docker container
+- The service processes all unprocessed events and exits
+- Logs are written to `/var/log/notify-fan-out.log`

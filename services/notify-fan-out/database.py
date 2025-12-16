@@ -74,73 +74,144 @@ class Database:
 
         return DomainEvent(response.data)
 
+    def get_unprocessed_events(self, limit: int = 100) -> List[DomainEvent]:
+        """
+        Fetch domain events that haven't been processed yet.
+        Returns events where processed_at IS NULL, ordered by id ascending.
+        """
+        try:
+            response = (
+                self.client.table("domain_events")
+                .select(
+                    """
+                    id,
+                    event_type,
+                    actor_id,
+                    project_id,
+                    resource_id,
+                    thread_id,
+                    meeting_id,
+                    occurred_at,
+                    payload,
+                    projects!domain_events_project_id_fkey(owner_org_id),
+                    resources:resources!domain_events_resource_id_fkey(org_id)
+                    """
+                )
+                .is_("processed_at", "null")
+                .order("id", desc=False)
+                .limit(limit)
+                .execute()
+            )
+
+            if not response.data:
+                return []
+
+            return [DomainEvent(row) for row in response.data]
+        except Exception as e:
+            logger.error("Failed to fetch unprocessed events: %s", e)
+            return []
+
+    def mark_event_processed(self, event_id: int) -> bool:
+        """
+        Mark a domain event as processed by setting processed_at to NOW().
+        Returns True on success.
+        """
+        try:
+            self.client.table("domain_events").update(
+                {"processed_at": "now()"}
+            ).eq("id", event_id).execute()
+            return True
+        except Exception as e:
+            logger.error("Failed to mark event %d as processed: %s", event_id, e)
+            return False
+
     def get_profile_name(self, user_id: Optional[str]) -> str:
         """Get display name for a user."""
         if not user_id:
             return "Someone"
 
-        response = (
-            self.client.table("profiles")
-            .select("full_name, email")
-            .eq("id", user_id)
-            .maybe_single()
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table("profiles")
+                .select("full_name, email")
+                .eq("id", user_id)
+                .maybe_single()
+                .execute()
+            )
 
-        if not response.data:
+            data = getattr(response, "data", None)
+            if not data:
+                return "Someone"
+
+            return data.get("full_name") or data.get("email") or "Someone"
+        except Exception as e:
+            logger.error("get_profile_name failed for user=%s: %s", user_id, e)
             return "Someone"
-
-        return response.data.get("full_name") or response.data.get("email") or "Someone"
 
     def get_project_name(self, project_id: str) -> str:
         """Get project name by ID."""
-        response = (
-            self.client.table("projects")
-            .select("name")
-            .eq("id", project_id)
-            .maybe_single()
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table("projects")
+                .select("name")
+                .eq("id", project_id)
+                .maybe_single()
+                .execute()
+            )
 
-        if not response.data:
+            data = getattr(response, "data", None)
+            if not data:
+                return "Project"
+
+            return data.get("name") or "Project"
+        except Exception as e:
+            logger.error("get_project_name failed for project=%s: %s", project_id, e)
             return "Project"
-
-        return response.data.get("name") or "Project"
 
     def get_thread_info(self, thread_id: str) -> Optional[Dict[str, Any]]:
         """Get thread information."""
-        response = (
-            self.client.table("chat_threads")
-            .select("id, topic, project_id")
-            .eq("id", thread_id)
-            .maybe_single()
-            .execute()
-        )
-
-        return response.data
+        try:
+            response = (
+                self.client.table("chat_threads")
+                .select("id, topic, project_id")
+                .eq("id", thread_id)
+                .maybe_single()
+                .execute()
+            )
+            return getattr(response, "data", None)
+        except Exception as e:
+            logger.error("get_thread_info failed for thread=%s: %s", thread_id, e)
+            return None
 
     def get_thread_participants(self, thread_id: str) -> List[Dict[str, str]]:
         """Get all participants in a thread."""
-        response = (
-            self.client.table("chat_thread_participants")
-            .select("user_id")
-            .eq("thread_id", thread_id)
-            .execute()
-        )
-
-        return response.data or []
+        try:
+            response = (
+                self.client.table("chat_thread_participants")
+                .select("user_id")
+                .eq("thread_id", thread_id)
+                .execute()
+            )
+            return getattr(response, "data", None) or []
+        except Exception as e:
+            logger.error("get_thread_participants failed for thread=%s: %s", thread_id, e)
+            return []
 
     def get_meeting_participants(
         self, meeting_id: str, exclude_user_id: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """Get all participants in a meeting, optionally excluding a user."""
-        query = self.client.table("meeting_participants").select("user_id").eq("meeting_id", meeting_id)
+        try:
+            query = self.client.table("meeting_participants").select("user_id").eq("meeting_id", meeting_id)
 
-        if exclude_user_id:
-            query = query.neq("user_id", exclude_user_id)
+            if exclude_user_id:
+                query = query.neq("user_id", exclude_user_id)
 
-        response = query.execute()
-        return response.data or []
+            response = query.execute()
+            return getattr(response, "data", None) or []
+        except Exception as e:
+            logger.error("get_meeting_participants failed for meeting=%s: %s", meeting_id, e)
+            return []
 
     def collect_candidate_user_ids(self, event: DomainEvent) -> Set[str]:
         """
@@ -149,32 +220,35 @@ class Database:
         """
         ids: Set[str] = set()
 
-        # Get project access grants
-        grants_response = (
-            self.client.table("project_access_grants")
-            .select("user_id")
-            .eq("project_id", event.project_id)
-            .execute()
-        )
-
-        for row in grants_response.data or []:
-            if row.get("user_id"):
-                ids.add(row["user_id"])
-
-        # Get org owners
-        org_id = event.resource_org_id or event.owner_org_id
-        if org_id:
-            owners_response = (
-                self.client.table("org_members")
+        try:
+            # Get project access grants
+            grants_response = (
+                self.client.table("project_access_grants")
                 .select("user_id")
-                .eq("org_id", org_id)
-                .eq("role", "owner")
+                .eq("project_id", event.project_id)
                 .execute()
             )
 
-            for row in owners_response.data or []:
+            for row in getattr(grants_response, "data", None) or []:
                 if row.get("user_id"):
                     ids.add(row["user_id"])
+
+            # Get org owners
+            org_id = event.resource_org_id or event.owner_org_id
+            if org_id:
+                owners_response = (
+                    self.client.table("org_members")
+                    .select("user_id")
+                    .eq("org_id", org_id)
+                    .eq("role", "owner")
+                    .execute()
+                )
+
+                for row in getattr(owners_response, "data", None) or []:
+                    if row.get("user_id"):
+                        ids.add(row["user_id"])
+        except Exception as e:
+            logger.error("collect_candidate_user_ids failed for event=%s: %s", event.id, e)
 
         return ids
 
@@ -187,26 +261,34 @@ class Database:
 
         results: List[str] = []
         for user_id in candidate_ids:
-            response = self.client.rpc(
-                "can_view",
-                {"p_user_id": user_id, "p_resource_id": resource_id},
-            ).execute()
+            try:
+                response = self.client.rpc(
+                    "can_view",
+                    {"p_user_id": user_id, "p_resource_id": resource_id},
+                ).execute()
 
-            if response.data is True:
-                results.append(user_id)
+                if getattr(response, "data", None) is True:
+                    results.append(user_id)
+            except Exception as e:
+                logger.error("filter_by_resource_access failed for user=%s resource=%s: %s", user_id, resource_id, e)
 
         return results
 
     def get_existing_notification_recipients(self, event_id: int) -> Set[str]:
         """Get user IDs who already have notifications for this event."""
-        response = (
-            self.client.table("notifications")
-            .select("user_id")
-            .eq("event_id", event_id)
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table("notifications")
+                .select("user_id")
+                .eq("event_id", event_id)
+                .execute()
+            )
 
-        return {row["user_id"] for row in (response.data or []) if row.get("user_id")}
+            data = getattr(response, "data", None) or []
+            return {row["user_id"] for row in data if row.get("user_id")}
+        except Exception as e:
+            logger.error("get_existing_notification_recipients failed for event=%s: %s", event_id, e)
+            return set()
 
     def check_user_preference_muted(
         self,
@@ -223,16 +305,20 @@ class Database:
 
         Hierarchy: Thread > Project > Global
         """
-        response = (
-            self.client.table("user_notification_preferences")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table("user_notification_preferences")
+                .select("*")
+                .eq("user_id", user_id)
+                .execute()
+            )
 
-        prefs = response.data or []
-        if not prefs:
-            return False  # Default: not muted
+            prefs = getattr(response, "data", None) or []
+            if not prefs:
+                return False  # Default: not muted
+        except Exception as e:
+            logger.error("check_user_preference_muted failed for user=%s: %s", user_id, e)
+            return False  # Default: not muted on error
 
         # Filter relevant preferences
         relevant = [
@@ -311,20 +397,28 @@ class Database:
         self, user_id: str, thread_id: str
     ) -> Optional[Dict[str, Any]]:
         """Get existing unread notification for a thread."""
-        response = (
-            self.client.table("notifications")
-            .select("id, payload")
-            .eq("user_id", user_id)
-            .is_("read_at", "null")
-            .eq("payload->>thread_id", thread_id)
-            .eq("payload->>type", "thread_activity")
-            .order("created_at", desc=True)
-            .limit(1)
-            .maybe_single()
-            .execute()
-        )
-
-        return response.data
+        try:
+            response = (
+                self.client.table("notifications")
+                .select("id, payload")
+                .eq("user_id", user_id)
+                .is_("read_at", "null")
+                .eq("payload->>thread_id", thread_id)
+                .eq("payload->>type", "thread_activity")
+                .order("created_at", desc=True)
+                .limit(1)
+                .maybe_single()
+                .execute()
+            )
+            return getattr(response, "data", None)
+        except Exception as e:
+            logger.error(
+                "get_unread_thread_notification failed for user=%s thread=%s: %s",
+                user_id,
+                thread_id,
+                e,
+            )
+            return None
 
     def increment_notification_count(self, notification_id: str) -> bool:
         """Increment the count in a notification's payload."""
@@ -340,32 +434,40 @@ class Database:
 
     def get_project_owner_org(self, project_id: str) -> Optional[str]:
         """Get the owner org ID for a project."""
-        response = (
-            self.client.table("projects")
-            .select("owner_org_id")
-            .eq("id", project_id)
-            .maybe_single()
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table("projects")
+                .select("owner_org_id")
+                .eq("id", project_id)
+                .maybe_single()
+                .execute()
+            )
 
-        if not response.data:
+            data = getattr(response, "data", None)
+            if not data:
+                return None
+
+            return data.get("owner_org_id")
+        except Exception as e:
+            logger.error("get_project_owner_org failed for project=%s: %s", project_id, e)
             return None
-
-        return response.data.get("owner_org_id")
 
     def check_user_is_org_owner(self, org_id: str, user_id: str) -> bool:
         """Check if a user is an owner of an org."""
-        response = (
-            self.client.table("org_members")
-            .select("user_id")
-            .eq("org_id", org_id)
-            .eq("role", "owner")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-
-        return response.data is not None
+        try:
+            response = (
+                self.client.table("org_members")
+                .select("user_id")
+                .eq("org_id", org_id)
+                .eq("role", "owner")
+                .eq("user_id", user_id)
+                .maybe_single()
+                .execute()
+            )
+            return getattr(response, "data", None) is not None
+        except Exception as e:
+            logger.error("check_user_is_org_owner failed for org=%s user=%s: %s", org_id, user_id, e)
+            return False
 
     def check_notification_exists(
         self,

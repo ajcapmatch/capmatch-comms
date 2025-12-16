@@ -39,8 +39,7 @@ if [ ! -d ".venv" ]; then
 fi
 
 echo ""
-echo "Starting development server..."
+echo "Running notify-fan-out job (will process events and exit)..."
 echo "=========================================="
 
 uv run python main.py
-
