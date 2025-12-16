@@ -35,46 +35,69 @@ fi
 echo ""
 echo "Step 1: Installing system dependencies..."
 sudo apt-get update
-sudo apt-get install -y docker.io git
+sudo apt-get install -y git
 
 echo ""
-echo "Step 2: Setting up Docker..."
-sudo usermod -aG docker "$USER"
-echo "✓ Docker installed. You may need to log out and back in for group changes to take effect."
+echo "Step 2: Checking Docker installation..."
+if command -v docker > /dev/null 2>&1 && docker info > /dev/null 2>&1; then
+    echo "✓ Docker is already installed and working"
+elif command -v docker > /dev/null 2>&1; then
+    echo "⚠️  Docker command exists but daemon is not accessible"
+    echo "   You may need to log out and back in, or run: newgrp docker"
+else
+    echo "Installing Docker..."
+    # Try to install docker.io, but handle conflicts gracefully
+    if ! sudo apt-get install -y docker.io 2>&1; then
+        echo "⚠️  Docker installation had issues (may be conflict with existing Docker)"
+        echo "   If Docker is already installed via another method, continuing..."
+    fi
+fi
 
 echo ""
-echo "Step 3: Setting timezone to Pacific Time..."
+echo "Step 3: Setting up Docker group..."
+if ! groups | grep -q docker; then
+    sudo usermod -aG docker "$USER"
+    echo "✓ Added user to docker group. You may need to log out and back in for group changes to take effect."
+    NEED_LOGOUT=true
+else
+    echo "✓ User is already in docker group"
+    NEED_LOGOUT=false
+fi
+
+echo ""
+echo "Step 4: Setting timezone to Pacific Time..."
 sudo timedatectl set-timezone America/Los_Angeles
 echo "✓ Timezone set to America/Los_Angeles"
 
 echo ""
-echo "Step 4: Creating log directory..."
+echo "Step 5: Creating log directory..."
 sudo mkdir -p /var/log
 sudo touch /var/log/notify-fan-out.log
 sudo chown "$USER:$USER" /var/log/notify-fan-out.log
 echo "✓ Log file created at /var/log/notify-fan-out.log"
 
 echo ""
-echo "Step 5: Building Docker image..."
-if ! docker info > /dev/null 2>&1; then
-    echo "⚠️  Docker daemon not accessible. You may need to:"
-    echo "   1. Log out and back in (to pick up docker group)"
-    echo "   2. Or run: newgrp docker"
-    echo "   3. Then run this script again or manually: docker build -f services/notify-fan-out/Dockerfile -t capmatch-notify-fan-out:prod ."
-    exit 1
-fi
-
-if [ "$HAS_GIT_ROOT" = true ]; then
-    # Build from repo root so Dockerfile path matches repo layout
-    docker build -f "$REPO_ROOT/services/notify-fan-out/Dockerfile" -t capmatch-notify-fan-out:prod "$REPO_ROOT"
+echo "Step 6: Building Docker image..."
+if docker info > /dev/null 2>&1; then
+    if [ "$HAS_GIT_ROOT" = true ]; then
+        docker build -f "$REPO_ROOT/services/notify-fan-out/Dockerfile" -t capmatch-notify-fan-out:prod "$REPO_ROOT"
+    else
+        docker build -f "$SCRIPT_DIR/Dockerfile" -t capmatch-notify-fan-out:prod "$SCRIPT_DIR"
+    fi
+    echo "✓ Docker image built successfully"
 else
-    # Fallback: build from service directory only
-    docker build -f "$SCRIPT_DIR/Dockerfile" -t capmatch-notify-fan-out:prod "$SCRIPT_DIR"
+    echo "⚠️  Docker daemon not accessible. Skipping image build."
+    echo "   After logging out and back in (or running 'newgrp docker'), run:"
+    if [ "$HAS_GIT_ROOT" = true ]; then
+        echo "   docker build -f $REPO_ROOT/services/notify-fan-out/Dockerfile -t capmatch-notify-fan-out:prod $REPO_ROOT"
+    else
+        echo "   docker build -f $SCRIPT_DIR/Dockerfile -t capmatch-notify-fan-out:prod $SCRIPT_DIR"
+    fi
+    SKIP_BUILD=true
 fi
-echo "✓ Docker image built successfully"
 
 echo ""
-echo "Step 6: Setting up cron job..."
+echo "Step 7: Setting up cron job..."
 CRON_CMD="* * * * * $SCRIPT_DIR/run-notify-fan-out.sh"
 (crontab -l 2>/dev/null | grep -v "run-notify-fan-out.sh"; echo "$CRON_CMD") | crontab -
 echo "✓ Cron job added (runs every minute)"
@@ -89,10 +112,18 @@ echo "1. Ensure .env file exists in this directory with required variables:"
 echo "   - SUPABASE_URL"
 echo "   - SUPABASE_SERVICE_ROLE_KEY"
 echo ""
-echo "2. If you just added yourself to the docker group, log out and back in"
-echo ""
-echo "3. Test the service manually:"
-echo "   ./run-notify-fan-out.sh"
+if [ "$NEED_LOGOUT" = "true" ] || [ "${SKIP_BUILD:-false}" = "true" ]; then
+    echo "2. Log out and back in (or run 'newgrp docker') to pick up docker group changes"
+    if [ "${SKIP_BUILD:-false}" = "true" ]; then
+        echo "   Then build the Docker image manually (see command above)"
+    fi
+    echo ""
+    echo "3. Test the service manually:"
+    echo "   ./run-notify-fan-out.sh"
+else
+    echo "2. Test the service manually:"
+    echo "   ./run-notify-fan-out.sh"
+fi
 echo ""
 echo "4. Check logs:"
 echo "   tail -f /var/log/notify-fan-out.log"
